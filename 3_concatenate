@@ -1,0 +1,42 @@
+# Concatenate all files from the same lane for each sample
+for f in /staton/projects/bovine_hyperthermia/analysis/2_skewer/*L001-trimmed-pair1.fastq
+do
+ filename=$(basename "$f")
+ base="${filename%%-trimmed-pair1.fastq*}"
+ echo "filename $filename base $base"
+ 
+ if [ -s /staton/projects/bovine_hyperthermia/analysis/2_skewer/${base}_003-trimmed-pair1.fastq ]; then
+  cat /staton/projects/bovine_hyperthermia/analysis/2_skewer/$base-trimmed-pair1.fastq /staton/projects/bovine_hyperthermia/analysis/2_skewer/${base}_002-trimmed-pair1.fastq /staton/projects/bovine_hyperthermia/analysis/2_skewer/${base}_003-trimmed-pair1.fastq > $base-trimmed-pair1.fastq
+  cat /staton/projects/bovine_hyperthermia/analysis/2_skewer/$base-trimmed-pair2.fastq /staton/projects/bovine_hyperthermia/analysis/2_skewer/${base}_002-trimmed-pair2.fastq /staton/projects/bovine_hyperthermia/analysis/2_skewer/${base}_003-trimmed-pair2.fastq > $base-trimmed-pair2.fastq
+  else
+  cat /staton/projects/bovine_hyperthermia/analysis/2_skewer/$base-trimmed-pair1.fastq /staton/projects/bovine_hyperthermia/analysis/2_skewer/${base}_002-trimmed-pair1.fastq > $base-trimmed-pair1.fastq
+  cat /staton/projects/bovine_hyperthermia/analysis/2_skewer/$base-trimmed-pair2.fastq /staton/projects/bovine_hyperthermia/analysis/2_skewer/${base}_002-trimmed-pair2.fastq > $base-trimmed-pair2.fastq
+ 
+ fi
+
+done
+
+# Concatenate the combined lane folders for each sample
+for f in /staton/projects/bovine_hyperthermia/analysis/2_skewer/concat/*-trimmed-pair1.fastq
+do
+ filename=$(basename "$f")
+ base="${filename%%_L001-trimmed-pair1.fastq*}"
+ echo "filename $filename base $base"
+ 
+ cat /staton/projects/bovine_hyperthermia/analysis/2_skewer/concat/${base}_L001-trimmed-pair1.fastq /staton/projects/bovine_hyperthermia/analysis_L002/2_skewer/concat/${base}_L002-trimmed-pair1.fastq > $filename
+ cat /staton/projects/bovine_hyperthermia/analysis/2_skewer/concat/${base}_L001-trimmed-pair2.fastq /staton/projects/bovine_hyperthermia/analysis_L002/2_skewer/concat/${base}_L002-trimmed-pair2.fastq > ${base}_L001-trimmed-pair2.fastq
+
+done
+
+# FastQC and MultiQC of combined reads
+for f in /staton/projects/bovine_hyperthermia/analysis/combined_lanes/*.fastq
+do
+    filename=$(basename "$f")
+    base="${filename%%.fastq*}"
+    echo "filename $filename base $base"
+    mkdir $base.fastQC
+
+    /staton/software/FastQC-v0.11.5/FastQC/fastqc -o $base.fastQC $f >& $base.fastQC.out &
+done
+
+multiqc .
