@@ -1,0 +1,25 @@
+# HTSeq counts
+for bam in /staton/projects/bovine_hyperthermia/analysis/sort_bam/*bam
+do
+  base=$( basename $bam | sed 's/.sorted.bam//g')
+
+  echo "bam $bam"
+  echo "base $base"
+  echo "--"
+
+  /staton/software/htseq-count \
+   --format=bam \
+   --order=pos \
+   --stranded=no \
+   --type=gene \
+   --idattr=ID \
+   $bam \
+   /staton/projects/bovine_hyperthermia/analysis/reference_genome/Bos_taurus.UMD3.1.91.gff3 \
+   >$base.counts.txt \
+   2> $base.out &
+
+echo "-------"
+
+done
+
+# Transfer files from working environment to RStudio for DESeq2 analysis
