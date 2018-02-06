@@ -1,0 +1,21 @@
+for g in ../../raw_data/Project_Edwards_Rispoli/Sample*
+ do
+ for R1 in ../../raw_data/Project_Edwards_Rispoli/$g/*L001_R1_001.fastq.gz
+  do
+   R2=`sed 's/_R1/_R2/' <(echo $R1)`
+   BASE=$( basename $R1 | sed 's/_R1_001.fastq.gz*//g')
+   echo "R1 $R1"
+   echo "R2 $R2"
+   echo "BASE $BASE"
+
+   /staton/software/skewer/skewer \
+   -x /staton/software/Trimmomatic-0.35/adapters/illuminaClipping.fa \
+   -l 30 \
+   $R1 \
+   $R2 \
+   -o $BASE \
+   >& $BASE.trim_output &             
+ done
+done
+
+# Repeat this step for all remaining files.
