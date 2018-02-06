@@ -1,0 +1,313 @@
+# Set-Up for Analysis - q = 0.05
+setwd("~/Downloads/bovine_htseq/")
+library(DESeq2)
+
+# Get File Names
+fileName <- list.files(path = ".", pattern = "*.txt")
+fileName
+
+# Get Sample Names
+sampleName <- sapply(strsplit(fileName, "[.]"), "[[", 1)
+sampleName
+
+# Get Cell Type
+cell <- factor(c("Granulosa", "Granulosa", "Cumulus", "Cumulus", "Cumulus", "Granulosa", "Granulosa", "Granulosa", "Granulosa", "Cumulus", "Cumulus", "Cumulus", "Granulosa", "Granulosa", "Granulosa", "Cumulus", "Cumulus", "Cumulus"))
+cell
+
+# Get Temperature Level
+temp <- factor(c("Control", "Control", "Control", "Control", "Intermediate", "Intermediate", "Intermediate", "Intermediate", "Control", "Intermediate", "Control", "Intermediate", "HS", "HS", "HS", "HS", "HS", "HS"))
+temp
+
+# Build the Sample Table
+HyperthermiaSampleTable <- data.frame(sampleName, fileName, cell, temp)
+HyperthermiaSampleTable
+
+# Build DESeq Dataset - Cell Type
+HyperthermiaDESeqData_Cell <- DESeqDataSetFromHTSeqCount(sampleTable = HyperthermiaSampleTable, directory = ".", design = ~ temp + cell)
+HyperthermiaDESeqData_Cell
+head(counts(HyperthermiaDESeqData_Cell))
+
+# Pre-Filtering
+dim(HyperthermiaDESeqData_Cell)
+HyperthermiaDESeqData_Cell <- HyperthermiaDESeqData_Cell[ rowSums(counts(HyperthermiaDESeqData_Cell)) > 1, ]
+dim(HyperthermiaDESeqData_Cell)
+
+# DESeq Analysis 1
+CellHSDESeq.Res <- DESeq(HyperthermiaDESeqData_Cell)
+
+# Cell Comparisons
+CellRes <- results(CellHSDESeq.Res, alpha = 0.05, contrast = c("cell", "Cumulus", "Granulosa"))
+summary(CellRes)
+
+# Build DESeq Dataset - Temperature
+HyperthermiaDESeqData_Temp <- DESeqDataSetFromHTSeqCount(sampleTable = HyperthermiaSampleTable, directory = ".", design = ~ cell + temp)
+HyperthermiaDESeqData_Temp
+head(counts(HyperthermiaDESeqData_Temp))
+
+# Pre-Filtering
+dim(HyperthermiaDESeqData_Temp)
+HyperthermiaDESeqData_Temp <- HyperthermiaDESeqData_Temp[ rowSums(counts(HyperthermiaDESeqData_Temp)) > 1, ]
+dim(HyperthermiaDESeqData_Temp)
+
+# DESeq Analysis 2
+TempHSDESeq.Res <- DESeq(HyperthermiaDESeqData_Temp)
+
+# Temperature Comparisons
+ControlvInter <- results(TempHSDESeq.Res, alpha = 0.05, contrast = c("temp", "Control", "Intermediate"))
+summary(ControlvInter)
+ControlvHS <- results(TempHSDESeq.Res, alpha = 0.05, contrast = c("temp", "Control", "HS"))
+summary(ControlvHS)
+IntervHS <- results(TempHSDESeq.Res, alpha = 0.05, contrast = c("temp", "Intermediate", "HS"))
+summary(IntervHS)
+
+# q = 0.1 Analysis
+# Cell Comparisons
+CellRes2 <- results(CellHSDESeq.Res, alpha = 0.1, contrast = c("cell", "Cumulus", "Granulosa"))
+summary(CellRes2)
+
+# Temperature Comparisons
+ControlvInter2 <- results(TempHSDESeq.Res, alpha = 0.1, contrast = c("temp", "Control", "Intermediate"))
+summary(ControlvInter2)
+ControlvHS2 <- results(TempHSDESeq.Res, alpha = 0.1, contrast = c("temp", "Control", "HS"))
+summary(ControlvHS2)
+IntervHS2 <- results(TempHSDESeq.Res, alpha = 0.1, contrast = c("temp", "Intermediate", "HS"))
+summary(IntervHS2)
+
+# Specific comparisons - Cumulus HS differences
+HyperthermiaDESeqData_Temp$group <- factor(paste0(HyperthermiaDESeqData_Temp$cell, HyperthermiaDESeqData_Temp$temp))
+design(HyperthermiaDESeqData_Temp) <- ~ group
+CumulusTempHSDESeq.Res <- DESeq(HyperthermiaDESeqData_Temp)
+Cumulus_HvC <- results(CumulusTempHSDESeq.Res, alpha = 0.05, contrast = c("group", "CumulusHS", "CumulusControl"))
+summary(Cumulus_HvC)
+Cumulus_HvI <- results(CumulusTempHSDESeq.Res, alpha = 0.05, contrast = c("group", "CumulusHS", "CumulusIntermediate"))
+summary(Cumulus_HvI)
+Cumulus_IvC <- results(CumulusTempHSDESeq.Res, alpha = 0.05, contrast = c("group", "CumulusControl", "CumulusIntermediate"))
+summary(Cumulus_IvC)
+
+# Specific comparisons - Granulosa HS differences
+Granulosa_HvC <- results(CumulusTempHSDESeq.Res, alpha = 0.05, contrast = c("group", "GranulosaHS", "GranulosaControl"))
+summary(Granulosa_HvC)
+Granulosa_HvI <- results(CumulusTempHSDESeq.Res, alpha = 0.05, contrast = c("group", "GranulosaHS", "GranulosaIntermediate"))
+summary(Granulosa_HvI)
+Granulosa_IvC <- results(CumulusTempHSDESeq.Res, alpha = 0.05, contrast = c("group", "GranulosaIntermediate", "GranulosaControl"))
+summary(Granulosa_IvC)
+
+# PCA Plot - Cell Comparison
+rld1 <- rlog(HyperthermiaDESeqData_Cell, blind = FALSE)
+plotPCA(rld1, intgroup = c("cell"))
+
+# PCA Plot - Temp Comparison
+rld2 <- rlog(HyperthermiaDESeqData_Temp, blind = FALSE)
+plotPCA(rld2, intgroup = c("temp"))
+
+# Clustering Heatmap 1
+library(pheatmap)
+library(RColorBrewer)
+library(genefilter)
+topVarGenesS <- head(order(rowVars(assay(rld1)), decreasing = TRUE), 20)
+matS  <- assay(rld1)[ topVarGenesS, ]
+matS  <- matS - rowMeans(matS)
+annoS <- as.data.frame(colData(rld1)[, c("cell","temp")])
+pheatmap(matS, annotation_col = annoS)
+
+# Clustering Heatmap 2
+topVarGenesS <- head(order(rowVars(assay(rld2)), decreasing = TRUE), 20)
+matS2  <- assay(rld2)[ topVarGenesS, ]
+matS2  <- matS - rowMeans(matS)
+annoS2 <- as.data.frame(colData(rld2)[, c("cell","temp")])
+pheatmap(matS2, annotation_col = annoS2)
+
+# MA Plots - q < 0.05
+plotMA(CellRes)
+plotMA(ControlvInter)
+plotMA(ControlvHS)
+plotMA(IntervHS)
+
+# MA Plots - q < 0.1
+plotMA(CellRes2)
+plotMA(ControlvInter2)
+plotMA(ControlvHS2)
+plotMA(IntervHS2)
+
+# Get Genes of Interest
+
+#dir.create("sigGenes")
+setwd("sigGenes/")
+
+padj_CellRes <- CellRes[order(CellRes$padj),]
+padj_CellRes <- subset(padj_CellRes, padj < 0.05)
+sigGenes_CellRes <- rownames(padj_CellRes)
+sigGenes_CellRes <- sapply(strsplit(sigGenes_CellRes, "[:]"), "[[", 2)
+
+padj_ControlvInter <- ControlvInter[order(ControlvInter$padj),]
+padj_ControlvInter <- subset(padj_ControlvInter, padj < 0.05)
+sigGenes_ControlvInter <- rownames(padj_ControlvInter)
+sigGenes_ControlvInter <- sapply(strsplit(sigGenes_ControlvInter, "[:]"), "[[", 2)
+
+padj_ControlvHS <- ControlvHS[order(ControlvHS$padj),]
+padj_ControlvHS <- subset(padj_ControlvHS, padj < 0.05)
+sigGenes_ControlvHS <- rownames(padj_ControlvHS)
+sigGenes_ControlvHS <- sapply(strsplit(sigGenes_ControlvHS, "[:]"), "[[", 2)
+
+padj_IntervHS <- IntervHS[order(IntervHS$padj),]
+padj_IntervHS <- subset(padj_IntervHS, padj < 0.05)
+sigGenes_IntervHS <- rownames(padj_IntervHS)
+sigGenes_IntervHS <- sapply(strsplit(sigGenes_IntervHS, "[:]"), "[[", 2)
+
+padj_CellRes2 <- CellRes2[order(CellRes2$padj),]
+padj_CellRes2 <- subset(padj_CellRes2, padj < 0.1)
+sigGenes_CellRes2 <- rownames(padj_CellRes2)
+sigGenes_CellRes2 <- sapply(strsplit(sigGenes_CellRes2, "[:]"), "[[", 2)
+
+padj_ControlvInter2 <- ControlvInter2[order(ControlvInter2$padj),]
+padj_ControlvInter2 <- subset(padj_ControlvInter2, padj < 0.1)
+sigGenes_ControlvInter2 <- rownames(padj_ControlvInter2)
+sigGenes_ControlvInter2 <- sapply(strsplit(sigGenes_ControlvInter2, "[:]"), "[[", 2)
+
+padj_ControlvHS2 <- ControlvHS2[order(ControlvHS2$padj),]
+padj_ControlvHS2 <- subset(padj_ControlvHS2, padj < 0.1)
+sigGenes_ControlvHS2 <- rownames(padj_ControlvHS2)
+sigGenes_ControlvHS2 <- sapply(strsplit(sigGenes_ControlvHS2, "[:]"), "[[", 2)
+
+padj_IntervHS2 <- IntervHS2[order(IntervHS2$padj),]
+padj_IntervHS2 <- subset(padj_IntervHS2, padj < 0.1)
+sigGenes_IntervHS2 <- rownames(padj_IntervHS2)
+sigGenes_IntervHS2 <- sapply(strsplit(sigGenes_IntervHS2, "[:]"), "[[", 2)
+
+# Load the Ensembl Bos taurus gene database with biomaRt
+library(biomaRt)
+bovine <- useMart("ensembl", dataset = "btaurus_gene_ensembl")
+
+# Get Gene Names and Descriptions
+sigGenes_annotated_CellRes <- getBM(attributes = c ("ensembl_gene_id", "external_gene_name", "description"), filters = 'ensembl_gene_id', values = sigGenes_CellRes, mart = bovine)
+alpha_CellRes <- padj_CellRes[order(rownames(padj_CellRes)),]
+rownames(alpha_CellRes) <- sapply(strsplit(rownames(alpha_CellRes), "[:]"), "[[", 2)
+annotated_CellRes <- data.frame(sigGenes_annotated_CellRes, alpha_CellRes)
+annotated_CellRes <- annotated_CellRes[order(annotated_CellRes$padj),]
+annotated_CellRes[1] <- NULL
+write.csv(annotated_CellRes, file = "CellRes_05.csv")
+
+sigGenes_annotated_ControlvInter <- getBM(attributes = c ("ensembl_gene_id", "external_gene_name", "description"), filters = 'ensembl_gene_id', values = sigGenes_ControlvInter, mart = bovine)
+alpha_ControlvInter <- padj_ControlvInter[order(rownames(padj_ControlvInter)),]
+rownames(alpha_ControlvInter) <- sapply(strsplit(rownames(alpha_ControlvInter), "[:]"), "[[", 2)
+annotated_ControlvInter <- data.frame(sigGenes_annotated_ControlvInter, alpha_ControlvInter)
+annotated_ControlvInter <- annotated_ControlvInter[order(annotated_ControlvInter$padj),]
+annotated_ControlvInter[1] <- NULL
+write.csv(annotated_ControlvInter, file = "ControlvsIntermediate_05.csv")
+
+sigGenes_annotated_ControlvHS <- getBM(attributes = c ("ensembl_gene_id", "external_gene_name", "description"), filters = 'ensembl_gene_id', values = sigGenes_ControlvHS, mart = bovine)
+alpha_ControlvHS <- padj_ControlvHS[order(rownames(padj_ControlvHS)),]
+rownames(alpha_ControlvHS) <- sapply(strsplit(rownames(alpha_ControlvHS), "[:]"), "[[", 2)
+annotated_ControlvHS <- data.frame(sigGenes_annotated_ControlvHS, alpha_ControlvHS)
+annotated_ControlvHS <- annotated_ControlvHS[order(annotated_ControlvHS$padj),]
+annotated_ControlvHS[1] <- NULL
+write.csv(annotated_ControlvHS, file = "ControlvsHeatStress_05.csv")
+
+sigGenes_annotated_IntervHS <- getBM(attributes = c ("ensembl_gene_id", "external_gene_name", "description"), filters = 'ensembl_gene_id', values = sigGenes_IntervHS, mart = bovine)
+alpha_IntervHS <- padj_IntervHS[order(rownames(padj_IntervHS)),]
+rownames(alpha_IntervHS) <- sapply(strsplit(rownames(alpha_IntervHS), "[:]"), "[[", 2)
+annotated_IntervHS <- data.frame(sigGenes_annotated_IntervHS, alpha_IntervHS)
+annotated_IntervHS <- annotated_IntervHS[order(annotated_IntervHS$padj),]
+annotated_IntervHS[1] <- NULL
+write.csv(annotated_IntervHS, file = "IntermediatevsHeatStress_05.csv")
+
+sigGenes_annotated_CellRes2 <- getBM(attributes = c ("ensembl_gene_id", "external_gene_name", "description"), filters = 'ensembl_gene_id', values = sigGenes_CellRes2, mart = bovine)
+alpha_CellRes2 <- padj_CellRes2[order(rownames(padj_CellRes2)),]
+rownames(alpha_CellRes2) <- sapply(strsplit(rownames(alpha_CellRes2), "[:]"), "[[", 2)
+annotated_CellRes2 <- data.frame(sigGenes_annotated_CellRes2, alpha_CellRes2)
+annotated_CellRes2 <- annotated_CellRes2[order(annotated_CellRes2$padj),]
+annotated_CellRes2[1] <- NULL
+write.csv(annotated_CellRes2, file = "CellRes_1.csv")
+
+sigGenes_annotated_ControlvInter2 <- getBM(attributes = c ("ensembl_gene_id", "external_gene_name", "description"), filters = 'ensembl_gene_id', values = sigGenes_ControlvInter2, mart = bovine)
+alpha_ControlvInter2 <- padj_ControlvInter2[order(rownames(padj_ControlvInter2)),]
+rownames(alpha_ControlvInter2) <- sapply(strsplit(rownames(alpha_ControlvInter2), "[:]"), "[[", 2)
+annotated_ControlvInter2 <- data.frame(sigGenes_annotated_ControlvInter2, alpha_ControlvInter2)
+annotated_ControlvInter2 <- annotated_ControlvInter2[order(annotated_ControlvInter2$padj),]
+annotated_ControlvInter2[1] <- NULL
+write.csv(annotated_ControlvInter2, file = "ControlvsIntermediate_1.csv")
+
+sigGenes_annotated_ControlvHS2 <- getBM(attributes = c ("ensembl_gene_id", "external_gene_name", "description"), filters = 'ensembl_gene_id', values = sigGenes_ControlvHS2, mart = bovine)
+alpha_ControlvHS2 <- padj_ControlvHS2[order(rownames(padj_ControlvHS2)),]
+rownames(alpha_ControlvHS2) <- sapply(strsplit(rownames(alpha_ControlvHS2), "[:]"), "[[", 2)
+annotated_ControlvHS2 <- data.frame(sigGenes_annotated_ControlvHS2, alpha_ControlvHS2)
+annotated_ControlvHS2 <- annotated_ControlvHS2[order(annotated_ControlvHS2$padj),]
+annotated_ControlvHS2[1] <- NULL
+write.csv(annotated_ControlvHS2, file = "ControlvsHeatStress_1.csv")
+
+sigGenes_annotated_IntervHS2 <- getBM(attributes = c ("ensembl_gene_id", "external_gene_name", "description"), filters = 'ensembl_gene_id', values = sigGenes_IntervHS2, mart = bovine)
+alpha_IntervHS2 <- padj_IntervHS2[order(rownames(padj_IntervHS2)),]
+rownames(alpha_IntervHS2) <- sapply(strsplit(rownames(alpha_IntervHS2), "[:]"), "[[", 2)
+annotated_IntervHS2 <- data.frame(sigGenes_annotated_IntervHS2, alpha_IntervHS2)
+annotated_IntervHS2 <- annotated_IntervHS2[order(annotated_IntervHS2$padj),]
+annotated_IntervHS2[1] <- NULL
+write.csv(annotated_IntervHS2, file = "IntermediatevsHeatStress_1.csv")
+
+# Cumulus-Temp Comparisons
+
+padj_CumulusHvC <- Cumulus_HvC[order(Cumulus_HvC$padj),]
+padj_CumulusHvC <- subset(padj_CumulusHvC, padj < 0.05)
+sigGenes_CumulusHvC <- rownames(padj_CumulusHvC)
+sigGenes_CumulusHvC <- sapply(strsplit(sigGenes_CumulusHvC, "[:]"), "[[", 2)
+
+padj_CumulusHvI <- Cumulus_HvI[order(Cumulus_HvI$padj),]
+padj_CumulusHvI <- subset(padj_CumulusHvI, padj < 0.05)
+sigGenes_CumulusHvI <- rownames(padj_CumulusHvI)
+sigGenes_CumulusHvI <- sapply(strsplit(sigGenes_CumulusHvI, "[:]"), "[[", 2)
+
+padj_CumulusIvC <- Cumulus_IvC[order(Cumulus_IvC$padj),]
+padj_CumulusIvC <- subset(padj_CumulusIvC, padj < 0.05)
+sigGenes_CumulusIvC <- rownames(padj_CumulusIvC)
+sigGenes_CumulusIvC <- sapply(strsplit(sigGenes_CumulusIvC, "[:]"), "[[", 2)
+
+# No Significant DE Genes between Granulosa HS and Control
+
+padj_GranulosaHvI <- Granulosa_HvI[order(Granulosa_HvI$padj),]
+padj_GranulosaHvI <- subset(padj_GranulosaHvI, padj < 0.05)
+sigGenes_GranulosaHvI <- rownames(padj_GranulosaHvI)
+sigGenes_GranulosaHvI <- sapply(strsplit(sigGenes_GranulosaHvI, "[:]"), "[[", 2)
+
+padj_GranulosaIvC <- Granulosa_IvC[order(Granulosa_IvC$padj),]
+padj_GranulosaIvC <- subset(padj_GranulosaIvC, padj < 0.05)
+sigGenes_GranulosaIvC <- rownames(padj_GranulosaIvC)
+sigGenes_GranulosaIvC <- sapply(strsplit(sigGenes_GranulosaIvC, "[:]"), "[[", 2)
+
+sigGenes_annotated_CumulusHvC <- getBM(attributes = c ("ensembl_gene_id", "external_gene_name", "description"), filters = 'ensembl_gene_id', values = sigGenes_CumulusHvC, mart = bovine)
+alpha_CumulusHvC <- padj_CumulusHvC[order(rownames(padj_CumulusHvC)),]
+rownames(alpha_CumulusHvC) <- sapply(strsplit(rownames(alpha_CumulusHvC), "[:]"), "[[", 2)
+annotated_CumulusHvC <- data.frame(sigGenes_annotated_CumulusHvC, alpha_CumulusHvC)
+annotated_CumulusHvC <- annotated_CumulusHvC[order(annotated_CumulusHvC$padj),]
+annotated_CumulusHvC[1] <- NULL
+write.csv(annotated_CumulusHvC, file = "CumulusHvC.csv")
+
+sigGenes_annotated_CumulusHvI <- getBM(attributes = c ("ensembl_gene_id", "external_gene_name", "description"), filters = 'ensembl_gene_id', values = sigGenes_CumulusHvI, mart = bovine)
+alpha_CumulusHvI <- padj_CumulusHvI[order(rownames(padj_CumulusHvI)),]
+rownames(alpha_CumulusHvI) <- sapply(strsplit(rownames(alpha_CumulusHvI), "[:]"), "[[", 2)
+annotated_CumulusHvI <- data.frame(sigGenes_annotated_CumulusHvI, alpha_CumulusHvI)
+annotated_CumulusHvI <- annotated_CumulusHvI[order(annotated_CumulusHvI$padj),]
+annotated_CumulusHvI[1] <- NULL
+write.csv(annotated_CumulusHvI, file = "CumulusHvI.csv")
+
+sigGenes_annotated_CumulusIvC <- getBM(attributes = c ("ensembl_gene_id", "external_gene_name", "description"), filters = 'ensembl_gene_id', values = sigGenes_CumulusIvC, mart = bovine)
+alpha_CumulusIvC <- padj_CumulusIvC[order(rownames(padj_CumulusIvC)),]
+rownames(alpha_CumulusIvC) <- sapply(strsplit(rownames(alpha_CumulusIvC), "[:]"), "[[", 2)
+annotated_CumulusIvC <- data.frame(sigGenes_annotated_CumulusIvC, alpha_CumulusIvC)
+annotated_CumulusIvC <- annotated_CumulusIvC[order(annotated_CumulusIvC$padj),]
+annotated_CumulusIvC[1] <- NULL
+write.csv(annotated_CumulusIvC, file = "CumulusIvC.csv")
+
+sigGenes_annotated_GranulosaHvI <- getBM(attributes = c ("ensembl_gene_id", "external_gene_name", "description"), filters = 'ensembl_gene_id', values = sigGenes_GranulosaHvI, mart = bovine)
+alpha_GranulosaHvI <- padj_GranulosaHvI[order(rownames(padj_GranulosaHvI)),]
+rownames(alpha_GranulosaHvI) <- sapply(strsplit(rownames(alpha_GranulosaHvI), "[:]"), "[[", 2)
+annotated_GranulosaHvI <- data.frame(sigGenes_annotated_GranulosaHvI, alpha_GranulosaHvI)
+annotated_GranulosaHvI <- annotated_GranulosaHvI[order(annotated_GranulosaHvI$padj),]
+annotated_GranulosaHvI[1] <- NULL
+write.csv(annotated_GranulosaHvI, file = "GranulosaHvI.csv")
+
+sigGenes_annotated_GranulosaIvC <- getBM(attributes = c ("ensembl_gene_id", "external_gene_name", "description"), filters = 'ensembl_gene_id', values = sigGenes_GranulosaIvC, mart = bovine)
+alpha_GranulosaIvC <- padj_GranulosaIvC[order(rownames(padj_GranulosaIvC)),]
+rownames(alpha_GranulosaIvC) <- sapply(strsplit(rownames(alpha_GranulosaIvC), "[:]"), "[[", 2)
+annotated_GranulosaIvC <- data.frame(sigGenes_annotated_GranulosaIvC, alpha_GranulosaIvC)
+annotated_GranulosaIvC <- annotated_GranulosaIvC[order(annotated_GranulosaIvC$padj),]
+annotated_GranulosaIvC[1] <- NULL
+write.csv(annotated_GranulosaIvC, file = "GranulosaIvC.csv")
