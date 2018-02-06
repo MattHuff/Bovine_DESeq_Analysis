@@ -1,0 +1,18 @@
+# FastQC
+for g in ../../raw_data/Project_Edwards_Rispoli/Sample*
+ do
+ for f in ../../raw_data/Project_Edwards_Rispoli/$g/*L001_R*_001.fastq.gz
+  do
+     filename=$(basename "$f")
+     base="${filename%%.fastq.gz*}"
+     echo "filename $filename base $base"
+     mkdir $base.fastQC
+
+     /staton/software/FastQC-v0.11.5/FastQC/fastqc -o $base.fastQC $f >& $base.fastQC.out &
+ done
+done
+
+# Create similar codes for the other files (L001 becomes L002, _001 becomes _002 and _003)
+
+# MultiQC
+multiqc .
