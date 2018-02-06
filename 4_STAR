@@ -32,3 +32,28 @@ do
 done
 
 # Aggregate mapping statistics with MultiQC
+
+# Convert output from SAM to sorted BAM
+for sam in /staton/projects/il10_mouse/analysis/3_star/*sam
+do
+base=$( basename $sam | sed 's/.Aligned.out.sam//g')
+
+echo "sam $sam"
+echo "base $base"
+echo "--"
+
+echo "/staton/software/samtools-1.6/bin/samtools view \
+-bSh $sam \
+| \
+/staton/software/samtools-1.6/bin/samtools sort \
+-o $base.sorted.bam -T $base -@ 2 &"
+
+/staton/software/samtools-1.6/bin/samtools view \
+-bSh $sam \
+| \
+/staton/software/samtools-1.6/bin/samtools sort \
+-o $base.sorted.bam -T $base -@ 2 &
+
+echo "-------"
+
+done
