@@ -1,0 +1,34 @@
+# Obtaining the Bos taurus genome
+wget ftp://ftp.ensembl.org/pub/release-91/fasta/bos_taurus/dna_index/Bos_taurus.UMD3.1.dna.toplevel.fa.gz
+gunzip Bos_taurus.UMD3.1.dna.toplevel.fa.gz
+wget ftp://ftp.ensembl.org/pub/release-91/gff3/bos_taurus/Bos_taurus.UMD3.1.91.gff3.gz
+gunzip Bos_taurus.UMD3.1.91.gff3.gz
+
+# Genome Indexing
+/staton/software/STAR-2.5.3a/STAR \
+ --runMode genomeGenerate \
+ --genomeDir . \
+ --genomeFastaFiles Bos_taurus.UMD3.1.dna.toplevel.fa \
+ --runThreadN 1 \
+ --sjdbGTFfile Bos_taurus.UMD3.1.91.gff3 \
+ --sjdbGTFtagExonParentTranscript Parent \
+ --sjdbOverhang 100 \
+ --limitGenomeGenerateRAM=74928471424
+ 
+ # STAR Alignment
+ for f1 in /staton/projects/bovine_hyperthermia/analysis/combined_lanes/*pair1.fastq
+do
+ f2=`sed 's/pair1/pair2/' <(echo $f1)`
+ BASE=$( basename $f1 | sed 's/-trimmed-pair1.fastq*//g')
+ echo "f1 $f1"
+ echo "f2 $f2"
+ echo "BASE $BASE"
+ 
+ /staton/software/STAR-2.5.3a/STAR \
+ --genomeDir /staton/projects/bovine_hyperthermia/analysis/reference_genome \
+ --readFilesIn $f1 $f2 \
+ --runThreadN 2 \
+ --outFileNamePrefix $BASE. &
+done
+
+# Aggregate mapping statistics with MultiQC
